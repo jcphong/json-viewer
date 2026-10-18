@@ -104,8 +104,8 @@ tests/            *.test.ts, e2e/
 ## 5. Phases
 
 ### Phase 0: Project setup
-- [ ] 0.1 Scaffold Vite React-TS, add Tailwind, shadcn/ui, Biome, Vitest, Zustand. Add scripts `dev`, `build`, `preview`, `lint`, `format`, `test`.
-- [ ] 0.2 Base layout: toolbar on top, main pane, status bar (file name, size, node count, parse time). Dark/light mode follows the system, with a toggle.
+- [x] 0.1 Scaffold Vite React-TS, add Tailwind, shadcn/ui, Biome, Vitest, Zustand. Add scripts `dev`, `build`, `preview`, `lint`, `format`, `test`.
+- [x] 0.2 Base layout: toolbar on top, main pane, status bar (file name, size, node count, parse time). Dark/light mode follows the system, with a toggle.
 - [ ] 0.3 `scripts/gen-fixtures.ts` generates:
   - `deep.json`: 500 levels of nesting
   - `wide.json`: an array of 200k objects
