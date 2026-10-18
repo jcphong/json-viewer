@@ -26,8 +26,9 @@ After every task: `pnpm lint && pnpm test && pnpm build` must pass, then stop fo
 
 - `src/app/` — `App.tsx` (toolbar / main pane / status bar shell), app-level hooks.
 - `src/components/ui/` — shadcn/ui components. `src/components/<feature>/` for app components.
+- `src/components/editor/` — main JSON editor: `EditorPane` (Beautify / Minify / Copy / Clear, validation, error panel) and `JsonEditor` (CodeMirror 6, lazy-loaded into its own chunk). Tests swap in `tests/fakes/FakeJsonEditor.tsx` because CodeMirror doesn't run in jsdom.
 - `src/store/` — Zustand stores (`useViewerStore`, `useThemeStore`).
-- `src/lib/` — pure logic (formatting now; node index, rows, paths, search later). Unit-test everything here.
+- `src/lib/` — pure logic. Unit-test everything here. `json.ts` parses/formats with `lossless-json` (numbers keep their exact text); `errors.ts` maps parser positions to line/column + snippet.
 - `src/styles/globals.css` — Tailwind v4 entry + shadcn theme tokens (neutral). Dark mode is the `.dark` class on `<html>`.
 - `tests/` — Vitest tests (`*.test.ts[x]`); `tests/setup.ts` mocks `matchMedia`.
 - Import alias: `@/` → `src/`.
@@ -37,4 +38,5 @@ After every task: `pnpm lint && pnpm test && pnpm build` must pass, then stop fo
 - Biome formatting: 2-space indent, double quotes, semicolons, 100-col lines. Run `pnpm format` rather than hand-formatting.
 - TypeScript strict. Prefer `type` imports (`verbatimModuleSyntax` is on).
 - shadcn/ui: `components.json` targets style `radix-nova`, base color `neutral`, icons `lucide`. Add components with `pnpm dlx shadcn@latest add <name>`, then run `pnpm format`.
+- JSON syntax colors are CSS variables (`--syntax-key`, `--syntax-string`, …) in `globals.css`, also exposed as Tailwind colors (`text-syntax-string`). Reuse them for the tree view.
 - Theme: `system | light | dark`, stored in `localStorage` under `json-viewer:theme` (absent = system). `index.html` has a pre-paint script that mirrors `src/store/useThemeStore.ts` — keep them in sync.

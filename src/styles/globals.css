@@ -25,6 +25,15 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --radius: 0.625rem;
+
+  /* JSON syntax colors (editor now, tree view later). */
+  --syntax-key: oklch(0.46 0.16 262);
+  --syntax-string: oklch(0.5 0.13 152);
+  --syntax-number: oklch(0.56 0.16 48);
+  --syntax-literal: oklch(0.5 0.17 320);
+  --syntax-punctuation: oklch(0.556 0 0);
+  --editor-active-line: oklch(0.97 0 0 / 60%);
+  --editor-selection: oklch(0.88 0.04 262);
 }
 
 .dark {
@@ -47,6 +56,14 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+
+  --syntax-key: oklch(0.78 0.11 255);
+  --syntax-string: oklch(0.8 0.13 152);
+  --syntax-number: oklch(0.82 0.12 65);
+  --syntax-literal: oklch(0.78 0.13 320);
+  --syntax-punctuation: oklch(0.708 0 0);
+  --editor-active-line: oklch(1 0 0 / 4%);
+  --editor-selection: oklch(0.4 0.06 262);
 }
 
 @theme inline {
@@ -68,6 +85,11 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-syntax-key: var(--syntax-key);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-literal: var(--syntax-literal);
+  --color-syntax-punctuation: var(--syntax-punctuation);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
