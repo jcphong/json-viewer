@@ -1,10 +1,12 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "@/app/App";
 import { useThemeStore } from "@/store/useThemeStore";
 import { useViewerStore } from "@/store/useViewerStore";
+
+vi.mock("@/components/editor/JsonEditor", () => import("./fakes/FakeJsonEditor"));
 
 describe("App layout", () => {
   beforeEach(() => {
@@ -16,6 +18,7 @@ describe("App layout", () => {
     render(<App />);
     expect(screen.getByRole("banner")).toHaveTextContent("JSON Viewer");
     expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /beautify/i })).toBeInTheDocument();
     expect(screen.getByRole("contentinfo")).toHaveTextContent("No document loaded");
   });
 

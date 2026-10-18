@@ -20,9 +20,28 @@ export function formatCount(count: number): string {
   return countFormatter.format(Math.round(count));
 }
 
-/** Duration in ms, switching to seconds at 1s, e.g. 42.3 -> "42 ms", 2150 -> "2.15 s". */
+/** Duration in ms, switching to seconds at 1s, e.g. 0.4 -> "<1 ms", 42.3 -> "42 ms", 2150 -> "2.15 s". */
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "—";
+  if (ms < 1) return "<1 ms";
   if (ms < 1000) return `${Math.round(ms)} ms`;
   return `${(ms / 1000).toFixed(2)} s`;
+}
+
+/** UTF-8 byte length of a string without allocating an encoded copy. */
+export function utf8ByteLength(text: string): number {
+  let bytes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        i++;
+      } else bytes += 3;
+    } else bytes += 3;
+  }
+  return bytes;
 }

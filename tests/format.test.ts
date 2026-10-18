@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatBytes, formatCount, formatDuration } from "@/lib/format";
+import { formatBytes, formatCount, formatDuration, utf8ByteLength } from "@/lib/format";
 
 describe("formatBytes", () => {
   it("formats bytes, KB, MB, GB", () => {
@@ -31,6 +31,7 @@ describe("formatCount", () => {
 
 describe("formatDuration", () => {
   it("uses ms below one second and s above", () => {
+    expect(formatDuration(0.4)).toBe("<1 ms");
     expect(formatDuration(42.3)).toBe("42 ms");
     expect(formatDuration(999)).toBe("999 ms");
     expect(formatDuration(2150)).toBe("2.15 s");
@@ -38,5 +39,13 @@ describe("formatDuration", () => {
 
   it("handles invalid input", () => {
     expect(formatDuration(-5)).toBe("—");
+  });
+});
+
+describe("utf8ByteLength", () => {
+  it("matches TextEncoder", () => {
+    for (const text of ["", "abc", "é", "€", "😀", "a😀b", "שלום", "\u0000", "\ud800 lone"]) {
+      expect(utf8ByteLength(text)).toBe(new TextEncoder().encode(text).length);
+    }
   });
 });
