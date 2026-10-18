@@ -3,7 +3,7 @@ import { create } from "zustand";
 export type Theme = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
-// Keep in sync with the pre-paint script in index.html.
+// Keep in sync with the pre-paint script in public/theme-init.js.
 export const THEME_STORAGE_KEY = "json-viewer:theme";
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 const THEME_ORDER: Theme[] = ["system", "light", "dark"];

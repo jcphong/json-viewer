@@ -12,11 +12,14 @@ pnpm test         # Vitest (jsdom), runs once
 pnpm build        # tsc -b && vite build -> dist/
 ```
 
+Deploys: Vercel builds from `vercel.json` (production = `main`, preview per PR). CI in `.github/workflows/ci.yml` runs lint, test and build.
+
 After every task: `pnpm lint && pnpm test && pnpm build` must pass, then stop for review.
 
 ## Hard rules
 
 - **No data leaves the browser.** No backend, no analytics, no third-party requests at runtime (no web fonts from CDNs, etc.).
+- **The CSP in `vercel.json` enforces privacy.** It allows only `'self'` for scripts and connections, and no inline scripts (put pre-paint code in `public/`). A feature that needs another origin must update the policy deliberately; `tests/deploy-config.test.ts` guards it.
 - **No `innerHTML` / `dangerouslySetInnerHTML`.** Biome enforces `noDangerouslySetInnerHtml` as an error. Render untrusted JSON as text only.
 - **The full document lives only in the worker.** The main thread asks for row windows; never `postMessage` the whole tree.
 - **No recursion over document data.** Use iterative traversal (500-level nesting must not blow the stack).
@@ -39,4 +42,4 @@ After every task: `pnpm lint && pnpm test && pnpm build` must pass, then stop fo
 - TypeScript strict. Prefer `type` imports (`verbatimModuleSyntax` is on).
 - shadcn/ui: `components.json` targets style `radix-nova`, base color `neutral`, icons `lucide`. Add components with `pnpm dlx shadcn@latest add <name>`, then run `pnpm format`.
 - JSON syntax colors are CSS variables (`--syntax-key`, `--syntax-string`, …) in `globals.css`, also exposed as Tailwind colors (`text-syntax-string`). Reuse them for the tree view.
-- Theme: `system | light | dark`, stored in `localStorage` under `json-viewer:theme` (absent = system). `index.html` has a pre-paint script that mirrors `src/store/useThemeStore.ts` — keep them in sync.
+- Theme: `system | light | dark`, stored in `localStorage` under `json-viewer:theme` (absent = system). `public/theme-init.js` (loaded by `index.html` before first paint) mirrors `src/store/useThemeStore.ts` — keep them in sync.
