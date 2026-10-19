@@ -116,7 +116,7 @@ tests/            *.test.ts, e2e/
   - `data.jsonl`: 100k lines, including 3 malformed lines
   - `embeddings.json`: records with 1024-dim float arrays
   - `llm-trace.json`: OpenAI/Anthropic-style `messages` with `tool_calls` and `usage`
-- [ ] 0.4 Verify deploy on Vercel. Build output is `dist`.
+- [x] 0.4 Verify deploy on Vercel. Build output is `dist`.
 
 **Done when:** `pnpm build` passes, the empty shell is live on Vercel, and the fixtures are generated.
 
