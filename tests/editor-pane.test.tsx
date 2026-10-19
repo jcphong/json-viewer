@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorPane } from "@/components/editor/EditorPane";
 import { useViewerStore } from "@/store/useViewerStore";
 
+import { stubLayout } from "./helpers/layout";
+
 vi.mock("@/components/editor/JsonEditor", () => import("./fakes/FakeJsonEditor"));
 
 async function setup(initial: string) {
@@ -62,6 +64,25 @@ describe("EditorPane", () => {
     await user.click(await screen.findByRole("button", { name: /^copy$/i }));
     expect(writeText).toHaveBeenCalledWith("[1, 2]");
     expect(await screen.findByText("Copied")).toBeInTheDocument();
+  });
+
+  it("switches to the documents view and back, keeping the text", async () => {
+    stubLayout();
+    const { user, editor } = await setup('[{"_id":{"$oid":"6a9fdd120525594af2b1414c"},"n":1}]');
+    const toggle = screen.getByRole("button", { name: /documents/i });
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("ObjectId('6a9fdd120525594af2b1414c')")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /beautify/i })).toBeDisabled();
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    expect(editor.value).toBe('[{"_id":{"$oid":"6a9fdd120525594af2b1414c"},"n":1}]');
+  });
+
+  it("disables the documents view for invalid JSON", async () => {
+    await setup("{oops");
+    expect(screen.getByRole("button", { name: /documents/i })).toBeDisabled();
   });
 
   it("clears the document", async () => {
