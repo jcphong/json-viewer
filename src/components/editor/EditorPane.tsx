@@ -146,6 +146,17 @@ export function EditorPane() {
           <Minimize2 data-icon="inline-start" />
           Minify
         </Button>
+        <Button
+          size="sm"
+          variant={showingDocuments ? "default" : "secondary"}
+          aria-pressed={showingDocuments}
+          disabled={!showingDocuments && status.kind !== "valid"}
+          onClick={toggleDocuments}
+          title="Show as documents, like MongoDB Compass"
+        >
+          <Table2 data-icon="inline-start" />
+          Object
+        </Button>
         <div className="mx-1 h-4 w-px bg-border" />
         <Button size="sm" variant="ghost" disabled={empty} onClick={copy}>
           {copied === "ok" ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
@@ -154,18 +165,6 @@ export function EditorPane() {
         <Button size="sm" variant="ghost" disabled={empty || showingDocuments} onClick={clear}>
           <Trash2 data-icon="inline-start" />
           Clear
-        </Button>
-        <div className="mx-1 h-4 w-px bg-border" />
-        <Button
-          size="sm"
-          variant={showingDocuments ? "default" : "ghost"}
-          aria-pressed={showingDocuments}
-          disabled={!showingDocuments && status.kind !== "valid"}
-          onClick={toggleDocuments}
-          title="Show as documents, like MongoDB Compass"
-        >
-          <Table2 data-icon="inline-start" />
-          Documents
         </Button>
         <div className="ml-auto pr-1 text-xs">
           <ValidityBadge status={status} />

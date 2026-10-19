@@ -30,7 +30,7 @@ After every task: `pnpm lint && pnpm test && pnpm build` must pass, then stop fo
 - `src/app/` — `App.tsx` (toolbar / main pane / status bar shell), app-level hooks.
 - `src/components/ui/` — shadcn/ui components. `src/components/<feature>/` for app components.
 - `src/components/editor/` — main JSON editor: `EditorPane` (Beautify / Minify / Copy / Clear, validation, error panel) and `JsonEditor` (CodeMirror 6, lazy-loaded into its own chunk). Tests swap in `tests/fakes/FakeJsonEditor.tsx` because CodeMirror doesn't run in jsdom.
-- `src/components/documents/` — MongoDB Compass-style document view (toggled by the editor's **Documents** button): `DocumentView` (virtualized cards via `@tanstack/react-virtual`, expansion state kept above the list), `FieldList` (`key: value` rows, paged children). Value formatting and Extended JSON (`$oid`, `$date`, …) live in `src/lib/bson.ts`. Tests stub layout with `tests/helpers/layout.ts`.
+- `src/components/documents/` — MongoDB Compass-style document view (toggled by the editor's **Object** button, next to Minify): `DocumentView` (virtualized cards via `@tanstack/react-virtual`, expansion state kept above the list), `FieldList` (`key: value` rows, paged children). Value formatting and Extended JSON (`$oid`, `$date`, …) live in `src/lib/bson.ts`. Tests stub layout with `tests/helpers/layout.ts`.
 - `src/store/` — Zustand stores (`useViewerStore`, `useThemeStore`).
 - `src/lib/` — pure logic. Unit-test everything here. `json.ts` parses/formats with `lossless-json` (numbers keep their exact text); `errors.ts` maps parser positions to line/column + snippet.
 - `src/styles/globals.css` — Tailwind v4 entry + shadcn theme tokens (neutral). Dark mode is the `.dark` class on `<html>`.
