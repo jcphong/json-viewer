@@ -6,9 +6,11 @@ import type { JsonEditorHandle } from "@/components/editor/types";
 export default function FakeJsonEditor({
   ref,
   onChange,
+  wrap = false,
 }: {
   ref?: Ref<JsonEditorHandle>;
   onChange: () => void;
+  wrap?: boolean;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   useImperativeHandle(ref, () => ({
@@ -22,5 +24,5 @@ export default function FakeJsonEditor({
       if (position !== undefined) area.current?.setSelectionRange(position, position);
     },
   }));
-  return <textarea ref={area} aria-label="JSON editor" onChange={onChange} />;
+  return <textarea ref={area} aria-label="JSON editor" data-wrap={wrap} onChange={onChange} />;
 }
