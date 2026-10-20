@@ -18,7 +18,7 @@ describe("App layout", () => {
     render(<App />);
     expect(screen.getByRole("banner")).toHaveTextContent("JSON Viewer");
     expect(screen.getByRole("main")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /beautify/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Beautify" })).toBeInTheDocument();
     expect(screen.getByRole("contentinfo")).toHaveTextContent("No document loaded");
   });
 
