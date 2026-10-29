@@ -10,6 +10,7 @@ pnpm lint         # Biome: lint + format check + import sorting
 pnpm format       # Biome: apply safe fixes and formatting
 pnpm test         # Vitest (jsdom), runs once
 pnpm build        # tsc -b && vite build -> dist/
+pnpm fixtures     # generate test files in fixtures/ (--small, or by name); deterministic
 ```
 
 Deploys: Vercel builds from `vercel.json` (production = `main`, preview per PR). CI in `.github/workflows/ci.yml` runs lint, test and build.
@@ -34,6 +35,7 @@ After every task: `pnpm lint && pnpm test && pnpm build` must pass, then stop fo
 - `src/store/` — Zustand stores (`useViewerStore`, `useThemeStore`).
 - `src/lib/` — pure logic. Unit-test everything here. `json.ts` parses/formats with `lossless-json` (numbers keep their exact text); `errors.ts` maps parser positions to line/column + snippet.
 - `src/styles/globals.css` — Tailwind v4 entry + shadcn theme tokens (neutral). Dark mode is the `.dark` class on `<html>`.
+- `scripts/gen-fixtures.ts` — fixture CLI (Node runs the `.ts` directly). Generators are pure and live in `scripts/fixtures/` so tests can import them. Big fixtures are gitignored; small ones are committed and must match the generator (`tests/fixtures.test.ts`). Biome skips `fixtures/` (it contains invalid JSON on purpose).
 - `tests/` — Vitest tests (`*.test.ts[x]`); `tests/setup.ts` mocks `matchMedia`.
 - Import alias: `@/` → `src/`.
 
