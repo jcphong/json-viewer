@@ -1,7 +1,7 @@
 import { isolateHistory } from "@codemirror/commands";
 import { json } from "@codemirror/lang-json";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, placeholder } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { basicSetup } from "codemirror";
@@ -60,12 +60,16 @@ interface JsonEditorProps {
   ref?: Ref<JsonEditorHandle>;
   /** Called on every document change. Read the text with `getText()` when needed. */
   onChange: () => void;
+  /** Soft-wrap long lines (used for minified JSON, which is a single line). */
+  wrap?: boolean;
 }
 
-export default function JsonEditor({ ref, onChange }: JsonEditorProps) {
+export default function JsonEditor({ ref, onChange, wrap = false }: JsonEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const wrapCompartment = useRef(new Compartment());
+  const initialWrap = useRef(wrap);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -84,6 +88,7 @@ export default function JsonEditor({ ref, onChange }: JsonEditorProps) {
           syntaxHighlighting(jsonHighlight),
           editorTheme,
           placeholder("Paste or type JSON here…"),
+          wrapCompartment.current.of(initialWrap.current ? EditorView.lineWrapping : []),
           EditorView.contentAttributes.of({ "aria-label": "JSON editor" }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current();
@@ -98,6 +103,12 @@ export default function JsonEditor({ ref, onChange }: JsonEditorProps) {
       viewRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: wrapCompartment.current.reconfigure(wrap ? EditorView.lineWrapping : []),
+    });
+  }, [wrap]);
 
   useImperativeHandle(
     ref,

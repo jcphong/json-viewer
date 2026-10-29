@@ -1,15 +1,16 @@
-import { AlignLeft, Check, CircleAlert, Copy, Minimize2, Table2, Trash2 } from "lucide-react";
+import { Check, CircleAlert, Copy, Trash2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { DocumentView } from "@/components/documents/DocumentView";
 import { Button } from "@/components/ui/button";
 import type { JsonErrorInfo } from "@/lib/errors";
 import { utf8ByteLength } from "@/lib/format";
-import { beautifyJson, type FormatResult, minifyJson, parseJson } from "@/lib/json";
+import { beautifyJson, minifyJson, parseJson } from "@/lib/json";
 import { cn } from "@/lib/utils";
 import { useViewerStore } from "@/store/useViewerStore";
 
 import type { JsonEditorHandle } from "./types";
+import { type ViewMode, ViewModeSwitch } from "./ViewModeSwitch";
 
 // CodeMirror is the heaviest dependency; keep it out of the main bundle.
 const JsonEditor = lazy(() => import("./JsonEditor"));
@@ -31,8 +32,13 @@ export function EditorPane() {
   const setStats = useViewerStore((s) => s.setStats);
   const [status, setStatus] = useState<Status>({ kind: "empty" });
   const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
-  // In "documents" mode this holds the parsed root shown by DocumentView.
+  const [mode, setMode] = useState<ViewMode>("beautify");
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  // In "object" mode this holds the parsed root shown by DocumentView.
   const [documents, setDocuments] = useState<{ root: unknown } | null>(null);
+  // True until the editor first holds content, so a paste into an empty editor follows the mode.
+  const wasEmptyRef = useRef(true);
 
   const showValid = useCallback(
     (text: string, nodeCount: number, parseMs: number) => {
@@ -42,22 +48,53 @@ export function EditorPane() {
     [setStats],
   );
 
+  /** Rewrites the editor text minified or beautified. Returns false (and shows the error) if invalid. */
+  const applyFormat = useCallback(
+    (format: "minify" | "beautify"): boolean => {
+      const editor = editorRef.current;
+      if (!editor) return false;
+      window.clearTimeout(timerRef.current);
+      const result = (format === "minify" ? minifyJson : beautifyJson)(editor.getText());
+      if (!result.ok) {
+        setStatus({ kind: "invalid", error: result.error });
+        setStats(null);
+        editor.focusAt(result.error.position);
+        return false;
+      }
+      // The formatted text is already known to be valid; skip re-parsing it.
+      parsedRef.current = null;
+      applyingRef.current = true;
+      editor.setText(result.text);
+      applyingRef.current = false;
+      showValid(result.text, result.nodeCount, result.parseMs);
+      editor.focusAt();
+      return true;
+    },
+    [setStats, showValid],
+  );
+
   const validate = useCallback(() => {
     const text = editorRef.current?.getText() ?? "";
     if (text.trim() === "") {
+      wasEmptyRef.current = true;
       setStatus({ kind: "empty" });
       setStats(null);
       return;
     }
+    const firstContent = wasEmptyRef.current;
+    wasEmptyRef.current = false;
     const result = parseJson(text);
-    if (result.ok) {
-      parsedRef.current = { value: result.value };
-      showValid(text, result.nodeCount, result.parseMs);
-    } else {
+    if (!result.ok) {
       setStatus({ kind: "invalid", error: result.error });
       setStats(null);
+      return;
     }
-  }, [setStats, showValid]);
+    const current = modeRef.current;
+    // JSON pasted into an empty editor is shown in the selected format right away.
+    if (firstContent && current !== "object" && applyFormat(current)) return;
+    parsedRef.current = { value: result.value };
+    showValid(text, result.nodeCount, result.parseMs);
+  }, [setStats, showValid, applyFormat]);
 
   const handleChange = useCallback(() => {
     if (applyingRef.current) return;
@@ -71,26 +108,6 @@ export function EditorPane() {
   useEffect(() => {
     return () => window.clearTimeout(timerRef.current);
   }, []);
-
-  const apply = (format: (text: string) => FormatResult) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    window.clearTimeout(timerRef.current);
-    const result = format(editor.getText());
-    if (!result.ok) {
-      setStatus({ kind: "invalid", error: result.error });
-      setStats(null);
-      editor.focusAt(result.error.position);
-      return;
-    }
-    // The formatted text is already known to be valid; skip re-parsing it.
-    parsedRef.current = null;
-    applyingRef.current = true;
-    editor.setText(result.text);
-    applyingRef.current = false;
-    showValid(result.text, result.nodeCount, result.parseMs);
-    editor.focusAt();
-  };
 
   const copy = async () => {
     const text = editorRef.current?.getText() ?? "";
@@ -108,18 +125,23 @@ export function EditorPane() {
     editorRef.current?.focusAt();
   };
 
-  const toggleDocuments = () => {
-    if (documents) {
-      setDocuments(null);
-      editorRef.current?.focusAt();
+  const selectMode = (next: ViewMode) => {
+    if (next === "object") {
+      // Validation is debounced; make sure we show the current text, not a stale parse.
+      if (!parsedRef.current) {
+        window.clearTimeout(timerRef.current);
+        validate();
+      }
+      if (!parsedRef.current) return;
+      setDocuments({ root: parsedRef.current.value });
+      setMode("object");
       return;
     }
-    // Validation is debounced; make sure we show the current text, not a stale parse.
-    if (!parsedRef.current) {
-      window.clearTimeout(timerRef.current);
-      validate();
-    }
-    if (parsedRef.current) setDocuments({ root: parsedRef.current.value });
+    setDocuments(null);
+    const hasText = (editorRef.current?.getText().trim() ?? "") !== "";
+    // An empty editor just remembers the mode for the next paste.
+    if (!hasText || applyFormat(next)) setMode(next);
+    if (!hasText) editorRef.current?.focusAt();
   };
 
   const empty = status.kind === "empty";
@@ -128,35 +150,11 @@ export function EditorPane() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5">
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={empty || showingDocuments}
-          onClick={() => apply(beautifyJson)}
-        >
-          <AlignLeft data-icon="inline-start" />
-          Beautify
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={empty || showingDocuments}
-          onClick={() => apply(minifyJson)}
-        >
-          <Minimize2 data-icon="inline-start" />
-          Minify
-        </Button>
-        <Button
-          size="sm"
-          variant={showingDocuments ? "default" : "secondary"}
-          aria-pressed={showingDocuments}
-          disabled={!showingDocuments && status.kind !== "valid"}
-          onClick={toggleDocuments}
-          title="Show as documents, like MongoDB Compass"
-        >
-          <Table2 data-icon="inline-start" />
-          Object
-        </Button>
+        <ViewModeSwitch
+          mode={mode}
+          onSelect={selectMode}
+          objectDisabled={mode !== "object" && status.kind !== "valid"}
+        />
         <div className="mx-1 h-4 w-px bg-border" />
         <Button size="sm" variant="ghost" disabled={empty} onClick={copy}>
           {copied === "ok" ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
@@ -178,7 +176,7 @@ export function EditorPane() {
         <Suspense
           fallback={<div className="p-4 text-muted-foreground text-sm">Loading editor…</div>}
         >
-          <JsonEditor ref={editorRef} onChange={handleChange} />
+          <JsonEditor ref={editorRef} onChange={handleChange} wrap={mode === "minify"} />
         </Suspense>
       </div>
 
