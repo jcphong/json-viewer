@@ -1,0 +1,161 @@
+{
+  "chat_completions": {
+    "request": {
+      "model": "example-chat-model",
+      "temperature": 0.2,
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Current weather for a city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                },
+                "unit": {
+                  "enum": [
+                    "c",
+                    "f"
+                  ]
+                }
+              },
+              "required": [
+                "city"
+              ]
+            }
+          }
+        }
+      ],
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a concise travel assistant."
+        },
+        {
+          "role": "user",
+          "content": "Should I bring an umbrella to Hanoi tomorrow?"
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "call_01",
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\":\"Hanoi\",\"unit\":\"c\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_01",
+          "content": "{\"city\":\"Hanoi\",\"forecast\":\"rain\",\"high_c\":29,\"precip_mm\":12}"
+        }
+      ]
+    },
+    "response": {
+      "id": "chatcmpl-0001",
+      "object": "chat.completion",
+      "created": 1735689600,
+      "choices": [
+        {
+          "index": 0,
+          "finish_reason": "stop",
+          "message": {
+            "role": "assistant",
+            "content": "Yes. Rain is expected (about 12 mm), so bring an umbrella."
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 182,
+        "completion_tokens": 19,
+        "total_tokens": 201
+      }
+    }
+  },
+  "messages": {
+    "request": {
+      "model": "example-messages-model",
+      "max_tokens": 1024,
+      "system": "You are a careful coding assistant.",
+      "tools": [
+        {
+          "name": "run_tests",
+          "description": "Run the project's unit tests",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Do the tests pass on main?"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "I'll run them."
+            },
+            {
+              "type": "tool_use",
+              "id": "toolu_01",
+              "name": "run_tests",
+              "input": {
+                "path": "tests/"
+              }
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "toolu_01",
+              "content": "65 passed, 0 failed (2.4s)",
+              "is_error": false
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "id": "msg_0001",
+      "type": "message",
+      "role": "assistant",
+      "stop_reason": "end_turn",
+      "content": [
+        {
+          "type": "text",
+          "text": "All 65 tests pass on main."
+        }
+      ],
+      "usage": {
+        "input_tokens": 412,
+        "output_tokens": 11,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 256
+      }
+    }
+  }
+}
