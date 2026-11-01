@@ -1,0 +1,22 @@
+{
+  "service": "checkout",
+  "version": "2.4.1",
+  "replicas": 3,
+  "features": {
+    "cart": true,
+    "wishlist": false,
+    "gift_cards": true
+  },
+  "regions": ["eu-west-1", "us-east-1", "ap-southeast-1"],
+  "limits": {
+    "rps": 1200,
+    "burst": 300,
+    "timeout_ms": 2500
+  },
+  "database": {
+    "port": 5432
+    "host": "db.internal",
+    "pool": 20
+  },
+  "owners": ["team-payments"]
+}

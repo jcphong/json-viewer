@@ -21,6 +21,7 @@ pnpm dev
 | `pnpm lint` | Biome lint + format check |
 | `pnpm format` | Apply Biome fixes and formatting |
 | `pnpm test` | Run Vitest unit tests |
+| `pnpm fixtures` | Generate test files in `fixtures/` (see `fixtures/README.md`) |
 
 Stack: Vite, React, TypeScript, Tailwind CSS v4, shadcn/ui, Zustand, Biome, Vitest.
 
