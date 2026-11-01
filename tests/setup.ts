@@ -2,6 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
+// jsdom has no Web Workers; run the parser engine in-process instead.
+vi.mock("@/workers/client", () => import("./fakes/inProcessParser"));
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
