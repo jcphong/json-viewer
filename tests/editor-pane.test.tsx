@@ -36,12 +36,12 @@ describe("EditorPane", () => {
     useViewerStore.setState({ stats: null });
   });
 
-  it("offers Minify, Beautify and Object as a single choice, in that order", async () => {
+  it("offers Minify, Beautify, Object and Tree as a single choice, in that order", async () => {
     await renderPane();
     const group = screen.getByRole("radiogroup", { name: "View" });
     const options = screen.getAllByRole("radio");
     expect(group).toContainElement(options[0]);
-    expect(options.map((o) => o.textContent)).toEqual(["Minify", "Beautify", "Object"]);
+    expect(options.map((o) => o.textContent)).toEqual(["Minify", "Beautify", "Object", "Tree"]);
     expect(mode("Beautify")).toHaveAttribute("aria-checked", "true");
     expect(mode("Minify")).toHaveAttribute("aria-checked", "false");
   });
@@ -115,7 +115,7 @@ describe("EditorPane", () => {
     expect(mode("Object")).toHaveAttribute("aria-checked", "true");
     expect(mode("Beautify")).toHaveAttribute("aria-checked", "false");
     expect(screen.getByText("ObjectId('6a9fdd120525594af2b1414c')")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /clear/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /clear/i })).toBeEnabled();
     await user.click(mode("Minify"));
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
     expect(mode("Minify")).toHaveAttribute("aria-checked", "true");
