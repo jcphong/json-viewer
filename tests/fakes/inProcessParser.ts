@@ -3,20 +3,30 @@ import type { ParserApi } from "@/workers/parser.worker";
 
 /** jsdom stand-in for the parser worker: the same engine, called in-process (async like Comlink). */
 const engine = new DocumentEngine();
+let searchSeq = 0;
 
 const api: ParserApi = {
-  async load(source, name, onProgress) {
+  async load(source, name, onProgress, format) {
     const text = "file" in source ? await source.file.text() : source.text;
     const size = "file" in source ? source.file.size : undefined;
-    return engine.load(text, name, size, onProgress);
+    return engine.load(text, name, size, onProgress, format);
   },
+  setFormat: (format, onProgress) => engine.setFormat(format, onProgress),
   clear: () => engine.clear(),
   getRows: (start, end) => engine.getRows(start, end),
   toggle: (id) => engine.toggle(id),
   expandToDepth: (levels) => engine.expandToDepth(levels),
   collapseAll: () => engine.collapseAll(),
   rowOf: (id) => engine.rowOf(id),
-  reveal: (id) => engine.reveal(id),
+  reveal: (id) => ({ row: engine.reveal(id), visibleCount: engine.visibleCount() }),
+  search: (query, options) => {
+    const seq = ++searchSeq;
+    return engine.search(query, options, () => seq === searchSeq);
+  },
+  clearSearch: () => {
+    searchSeq++;
+    engine.clearSearch();
+  },
   detail: (id) => engine.detail(id),
   copyText: (id, format) => engine.copyText(id, format),
   stats: () => engine.getStats(),

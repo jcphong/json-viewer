@@ -5,6 +5,9 @@ export interface DocumentStats {
   sizeBytes: number;
   nodeCount: number;
   parseMs: number;
+  /** JSON Lines: non-blank lines and how many are malformed. */
+  lines?: number;
+  malformedLines?: number;
 }
 
 interface ViewerState {
