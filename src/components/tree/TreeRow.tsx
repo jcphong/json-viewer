@@ -91,7 +91,11 @@ export const TreeRow = memo(function TreeRow({
         <span className="w-4 shrink-0" />
       )}
       <span className="ml-1 shrink-0">
-        {row.key === null ? (
+        {row.line !== undefined ? (
+          <span className="text-muted-foreground" title={`Line ${row.line}`}>
+            #{row.line}
+          </span>
+        ) : row.key === null ? (
           <span className="text-muted-foreground">$</span>
         ) : typeof row.key === "number" ? (
           <span className="text-muted-foreground">{row.key}</span>

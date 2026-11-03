@@ -4,7 +4,7 @@
  */
 import * as Comlink from "comlink";
 
-import { type CopyFormat, DocumentEngine, type LoadResult } from "@/lib/engine";
+import { type CopyFormat, DocumentEngine, type FormatChoice, type LoadResult } from "@/lib/engine";
 
 export type LoadSource = { text: string } | { file: File };
 
@@ -16,11 +16,14 @@ const api = {
     source: LoadSource,
     name: string,
     onProgress?: (fraction: number) => void,
+    format: FormatChoice = "auto",
   ): Promise<LoadResult> {
     const text = "file" in source ? await source.file.text() : source.text;
     const size = "file" in source ? source.file.size : undefined;
-    return engine.load(text, name, size, onProgress);
+    return engine.load(text, name, size, onProgress, format);
   },
+  setFormat: (format: FormatChoice, onProgress?: (fraction: number) => void) =>
+    engine.setFormat(format, onProgress),
   clear: () => engine.clear(),
   getRows: (start: number, end: number) => engine.getRows(start, end),
   toggle: (id: number) => engine.toggle(id),

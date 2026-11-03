@@ -1,4 +1,6 @@
 import { ErrorPanel } from "@/components/editor/ErrorPanel";
+import { LineErrorsPanel } from "@/components/editor/LineErrorsPanel";
+import { Button } from "@/components/ui/button";
 import { useTreeStore } from "@/store/useTreeStore";
 
 import { SidePanel } from "./SidePanel";
@@ -11,6 +13,9 @@ export function TreePane() {
   const progress = useTreeStore((s) => s.progress);
   const loadingName = useTreeStore((s) => s.loadingName);
   const error = useTreeStore((s) => s.error);
+  const stats = useTreeStore((s) => s.stats);
+  const lineErrors = useTreeStore((s) => s.lineErrors);
+  const setFormat = useTreeStore((s) => s.setFormat);
 
   if (status === "loading") {
     const percent = progress === null ? null : Math.round(progress * 100);
@@ -45,7 +50,16 @@ export function TreePane() {
 
   if (status === "error" && error) {
     return (
-      <div className="flex flex-1 flex-col justify-end">
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm">
+          <p>This isn't valid JSON.</p>
+          <p className="text-muted-foreground">
+            If it has one JSON value per line, read it as JSON Lines.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => void setFormat("jsonl")}>
+            Read as JSONL
+          </Button>
+        </div>
         <ErrorPanel error={error} />
       </div>
     );
@@ -62,6 +76,9 @@ export function TreePane() {
           <SidePanel />
         </div>
       </div>
+      {stats?.format === "jsonl" && (
+        <LineErrorsPanel errors={lineErrors} total={stats.malformedLines} />
+      )}
     </div>
   );
 }

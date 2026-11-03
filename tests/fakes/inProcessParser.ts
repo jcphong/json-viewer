@@ -5,11 +5,12 @@ import type { ParserApi } from "@/workers/parser.worker";
 const engine = new DocumentEngine();
 
 const api: ParserApi = {
-  async load(source, name, onProgress) {
+  async load(source, name, onProgress, format) {
     const text = "file" in source ? await source.file.text() : source.text;
     const size = "file" in source ? source.file.size : undefined;
-    return engine.load(text, name, size, onProgress);
+    return engine.load(text, name, size, onProgress, format);
   },
+  setFormat: (format, onProgress) => engine.setFormat(format, onProgress),
   clear: () => engine.clear(),
   getRows: (start, end) => engine.getRows(start, end),
   toggle: (id) => engine.toggle(id),

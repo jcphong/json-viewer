@@ -1,7 +1,8 @@
 import { create } from "zustand";
 
-import type { DocumentStats } from "@/lib/engine";
+import type { DocumentStats, FormatChoice, LoadResult } from "@/lib/engine";
 import type { JsonErrorInfo } from "@/lib/errors";
+import type { LineError } from "@/lib/node-index";
 import { getParser, remoteCallback } from "@/workers/client";
 import type { LoadSource } from "@/workers/parser.worker";
 
@@ -15,12 +16,16 @@ interface TreeState {
   loadingName: string | null;
   stats: DocumentStats | null;
   error: JsonErrorInfo | null;
+  /** JSONL: the first malformed lines (stats.malformedLines has the exact count). */
+  lineErrors: LineError[];
   visibleCount: number;
   /** Bumped whenever the visible rows change, so cached rows are refetched. */
   version: number;
   selectedId: number | null;
 
-  load: (source: LoadSource, name: string) => Promise<boolean>;
+  load: (source: LoadSource, name: string, format?: FormatChoice) => Promise<boolean>;
+  /** Re-reads the loaded text as JSON or JSONL. */
+  setFormat: (format: FormatChoice) => Promise<boolean>;
   toggle: (id: number) => Promise<void>;
   expandToDepth: (levels: number) => Promise<void>;
   collapseAll: () => Promise<void>;
@@ -29,10 +34,49 @@ interface TreeState {
 }
 
 let loadSeq = 0;
+/** Name of the last loaded document, kept for format switches after a failed parse. */
+let currentName = "document";
 
 export const useTreeStore = create<TreeState>((set, get) => {
   const updateVisible = (visibleCount: number) =>
     set((s) => ({ visibleCount, version: s.version + 1 }));
+
+  /** Runs a load-like worker call, ignoring results superseded by a newer call. */
+  const run = async (
+    name: string,
+    call: (onProgress: (fraction: number) => void) => Promise<LoadResult | null>,
+  ): Promise<boolean> => {
+    const seq = ++loadSeq;
+    set({ status: "loading", progress: null, loadingName: name, error: null, selectedId: null });
+    const result = await call(
+      remoteCallback((fraction: number) => {
+        if (seq === loadSeq) set({ progress: fraction });
+      }),
+    );
+    // A newer load (or a reset) started meanwhile; drop this result.
+    if (seq !== loadSeq || !result) return false;
+    if (!result.ok) {
+      set({
+        status: "error",
+        error: result.error,
+        stats: null,
+        lineErrors: [],
+        visibleCount: 0,
+        loadingName: null,
+      });
+      return false;
+    }
+    set((s) => ({
+      status: "ready",
+      stats: result.stats,
+      lineErrors: result.lineErrors,
+      visibleCount: result.visibleCount,
+      version: s.version + 1,
+      progress: 1,
+      loadingName: null,
+    }));
+    return true;
+  };
 
   return {
     status: "empty",
@@ -40,42 +84,18 @@ export const useTreeStore = create<TreeState>((set, get) => {
     loadingName: null,
     stats: null,
     error: null,
+    lineErrors: [],
     visibleCount: 0,
     version: 0,
     selectedId: null,
 
-    load: async (source, name) => {
-      const seq = ++loadSeq;
-      set({ status: "loading", progress: null, loadingName: name, error: null, selectedId: null });
-      const result = await getParser().load(
-        source,
-        name,
-        remoteCallback((fraction: number) => {
-          if (seq === loadSeq) set({ progress: fraction });
-        }),
-      );
-      // A newer load (or a reset) started meanwhile; drop this result.
-      if (seq !== loadSeq) return false;
-      if (!result.ok) {
-        set({
-          status: "error",
-          error: result.error,
-          stats: null,
-          visibleCount: 0,
-          loadingName: null,
-        });
-        return false;
-      }
-      set((s) => ({
-        status: "ready",
-        stats: result.stats,
-        visibleCount: result.visibleCount,
-        version: s.version + 1,
-        progress: 1,
-        loadingName: null,
-      }));
-      return true;
+    load: (source, name, format = "auto") => {
+      currentName = name;
+      return run(name, (onProgress) => getParser().load(source, name, onProgress, format));
     },
+
+    setFormat: (format) =>
+      run(currentName, (onProgress) => getParser().setFormat(format, onProgress)),
 
     toggle: async (id) => updateVisible(await getParser().toggle(id)),
     expandToDepth: async (levels) => updateVisible(await getParser().expandToDepth(levels)),
@@ -91,6 +111,7 @@ export const useTreeStore = create<TreeState>((set, get) => {
         loadingName: null,
         stats: null,
         error: null,
+        lineErrors: [],
         visibleCount: 0,
         selectedId: null,
       });

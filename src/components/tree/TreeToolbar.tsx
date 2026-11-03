@@ -1,4 +1,5 @@
 import { ChevronsDownUp } from "lucide-react";
+import { ToggleGroup } from "radix-ui";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ export function TreeToolbar() {
   const stats = useTreeStore((s) => s.stats);
   const expandToDepth = useTreeStore((s) => s.expandToDepth);
   const collapseAll = useTreeStore((s) => s.collapseAll);
+  const setFormat = useTreeStore((s) => s.setFormat);
   const [confirming, setConfirming] = useState(false);
   const nodeCount = stats?.nodeCount ?? 0;
 
@@ -45,6 +47,28 @@ export function TreeToolbar() {
         <ChevronsDownUp data-icon="inline-start" />
         Collapse all
       </Button>
+      {stats && (
+        <ToggleGroup.Root
+          type="single"
+          value={stats.format}
+          onValueChange={(value) => {
+            if (value && value !== stats.format) void setFormat(value as "json" | "jsonl");
+          }}
+          aria-label="Read as"
+          className="order-last ml-auto inline-flex items-center gap-0.5 rounded-md bg-muted p-0.5"
+        >
+          {(["json", "jsonl"] as const).map((format) => (
+            <ToggleGroup.Item
+              key={format}
+              value={format}
+              title={format === "json" ? "One JSON document" : "JSON Lines: one value per line"}
+              className="rounded px-2 py-0.5 font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm dark:data-[state=on]:bg-input/60"
+            >
+              {format === "json" ? "JSON" : "JSONL"}
+            </ToggleGroup.Item>
+          ))}
+        </ToggleGroup.Root>
+      )}
       {confirming && (
         <div role="alert" className="ml-2 flex items-center gap-2 rounded-md bg-muted px-2 py-0.5">
           <span>

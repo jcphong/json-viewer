@@ -9,6 +9,10 @@ import { decodeJsonString } from "./json-string";
 import {
   ARRAY,
   buildIndex,
+  buildIndexAuto,
+  buildJsonlIndex,
+  type DocumentFormat,
+  type LineError,
   type NodeIndex,
   type NodeType,
   OBJECT,
@@ -31,19 +35,28 @@ export interface Row {
   truncated: boolean;
   childCount: number;
   expanded: boolean;
+  /** JSONL: the 1-based line number of a line's top-level value. */
+  line?: number;
 }
 
 export interface DocumentStats {
   name: string;
   sizeBytes: number;
+  format: DocumentFormat;
   nodeCount: number;
   maxDepth: number;
   parseMs: number;
+  /** JSONL: non-blank lines and how many of them are malformed. */
+  lines: number;
+  malformedLines: number;
 }
 
 export type LoadResult =
-  | { ok: true; stats: DocumentStats; visibleCount: number }
+  | { ok: true; stats: DocumentStats; visibleCount: number; lineErrors: LineError[] }
   | { ok: false; error: JsonErrorInfo };
+
+/** "auto" detects JSONL by file extension or by its parse-error signature. */
+export type FormatChoice = DocumentFormat | "auto";
 
 export interface NodeDetail {
   id: number;
@@ -55,6 +68,8 @@ export interface NodeDetail {
   /** Full value for display: decoded string, number text, or pretty JSON for containers (capped). */
   value: string;
   valueTruncated: boolean;
+  /** JSONL: the line this node belongs to (its path is relative to that line). */
+  line?: number;
 }
 
 export type CopyFormat = "value" | "pretty" | "minified";
@@ -71,35 +86,65 @@ export class DocumentEngine {
   /** Node id at every 256th visible row. Visible node ids increase with row order. */
   private checkpoints = new Int32Array(0);
   private visible = 0;
+  /** The last loaded text, kept even when it failed to parse, so the format can be switched. */
+  private source: { text: string; name: string; sizeBytes: number } | null = null;
 
   load(
     text: string,
     name: string,
     sizeBytes?: number,
     onProgress?: (fraction: number) => void,
+    format: FormatChoice = "auto",
   ): LoadResult {
     this.clear();
+    this.source = { text, name, sizeBytes: sizeBytes ?? utf8ByteLength(text) };
+    return this.reindex(format, onProgress);
+  }
+
+  /** Re-reads the current text as JSON or JSONL (the text stays in the worker). */
+  setFormat(format: FormatChoice, onProgress?: (fraction: number) => void): LoadResult | null {
+    if (!this.source) return null;
+    return this.reindex(format, onProgress);
+  }
+
+  private reindex(format: FormatChoice, onProgress?: (fraction: number) => void): LoadResult {
+    const source = this.source as NonNullable<typeof this.source>;
+    this.index = null;
     const startedAt = performance.now();
-    const result = buildIndex(text, onProgress);
+    const result =
+      format === "jsonl"
+        ? { ok: true as const, index: buildJsonlIndex(source.text, onProgress) }
+        : format === "json"
+          ? buildIndex(source.text, onProgress)
+          : buildIndexAuto(source.text, source.name, onProgress);
     if (!result.ok) return result;
     const { index } = result;
     let maxDepth = 0;
     for (let i = 0; i < index.count; i++) if (index.depth[i] > maxDepth) maxDepth = index.depth[i];
     this.index = index;
     this.stats = {
-      name,
-      sizeBytes: sizeBytes ?? utf8ByteLength(text),
-      nodeCount: index.count,
+      name: source.name,
+      sizeBytes: source.sizeBytes,
+      format: index.format,
+      nodeCount: index.format === "jsonl" ? index.count - 1 : index.count,
       maxDepth,
       parseMs: performance.now() - startedAt,
+      lines: index.lines,
+      malformedLines: index.malformedLines,
     };
     this.expanded = new Uint8Array(index.count);
     this.expanded[0] = 1;
     this.rebuild();
-    return { ok: true, stats: this.stats, visibleCount: this.visible };
+    return {
+      ok: true,
+      stats: this.stats,
+      visibleCount: this.visible,
+      lineErrors: index.lineErrors,
+    };
   }
 
   clear(): void {
+    this.source = null;
     this.index = null;
     this.stats = null;
     this.expanded = new Uint8Array(0);
@@ -201,6 +246,23 @@ export class DocumentEngine {
     const segments = this.segments(id);
     const start = index.start[id];
     const type = index.type[id];
+    const jsonl = index.format === "jsonl";
+    if (jsonl && id === 0) {
+      const value = reformatJson(this.jsonlArray(), 2, DETAIL_VALUE_CHARS);
+      return {
+        id,
+        path: "$",
+        segments: [],
+        type: "array",
+        childCount: index.childCount[0],
+        sizeBytes: this.stats?.sizeBytes ?? 0,
+        value: value.text,
+        valueTruncated: value.truncated,
+      };
+    }
+    // JSONL: each line is its own document; paths are relative to the line.
+    const line = jsonl ? (segments[0] as number) + 1 : undefined;
+    const pathSegments = jsonl ? segments.slice(1) : segments;
     const raw = index.text.slice(start, valueEnd(index, id));
     let value: { text: string; truncated: boolean };
     if (type === STRING) {
@@ -211,13 +273,14 @@ export class DocumentEngine {
     } else value = { text: raw, truncated: false };
     return {
       id,
-      path: toJsonPath(segments),
-      segments,
+      path: toJsonPath(pathSegments),
+      segments: pathSegments,
       type: TYPE_NAMES[type],
       childCount: index.childCount[id],
       sizeBytes: id === 0 && this.stats ? this.stats.sizeBytes : utf8ByteLength(raw),
       value: value.text,
       valueTruncated: value.truncated,
+      line,
     };
   }
 
@@ -225,6 +288,13 @@ export class DocumentEngine {
   copyText(id: number, format: CopyFormat): string {
     const index = this.index;
     if (!index || id < 0 || id >= index.count) return "";
+    if (index.format === "jsonl" && id === 0) {
+      // The whole file: as JSON Lines (one minified value per line) or as a pretty JSON array.
+      if (format === "pretty") return reformatJson(this.jsonlArray(), 2).text;
+      return this.jsonlValues()
+        .map((raw) => reformatJson(raw, 0).text)
+        .join("\n");
+    }
     const start = index.start[id];
     const raw = index.text.slice(start, valueEnd(index, id));
     if (format === "value" && index.type[id] === STRING) {
@@ -232,6 +302,21 @@ export class DocumentEngine {
     }
     if (format === "pretty") return reformatJson(raw, 2).text;
     return reformatJson(raw, 0).text;
+  }
+
+  /** Raw text of each valid JSONL line's value, in order. */
+  private jsonlValues(): string[] {
+    const index = this.index as NodeIndex;
+    const out: string[] = [];
+    for (let id = 1; id < index.count; id = index.subtreeEnd[id]) {
+      out.push(index.text.slice(index.start[id], valueEnd(index, id)));
+    }
+    return out;
+  }
+
+  /** The valid JSONL lines as one JSON array text. */
+  private jsonlArray(): string {
+    return `[${this.jsonlValues().join(",")}]`;
   }
 
   private next(id: number): number {
@@ -283,6 +368,7 @@ export class DocumentEngine {
     } else if (type !== OBJECT && type !== ARRAY) {
       preview = index.text.slice(index.start[id], valueEnd(index, id));
     }
+    const isLine = index.format === "jsonl" && index.parent[id] === 0;
     return {
       id,
       depth: index.depth[id],
@@ -292,6 +378,7 @@ export class DocumentEngine {
       truncated,
       childCount: index.childCount[id],
       expanded: this.expanded[id] === 1,
+      line: isLine ? -index.key[id] : undefined,
     };
   }
 }

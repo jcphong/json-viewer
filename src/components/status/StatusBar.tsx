@@ -12,6 +12,12 @@ export function StatusBar() {
             {stats.fileName}
           </span>
           <span>{formatBytes(stats.sizeBytes)}</span>
+          {stats.lines !== undefined && (
+            <span>
+              {formatCount(stats.lines)} lines
+              {stats.malformedLines ? ` (${formatCount(stats.malformedLines)} malformed)` : ""}
+            </span>
+          )}
           <span>{formatCount(stats.nodeCount)} nodes</span>
           <span>parsed in {formatDuration(stats.parseMs)}</span>
         </>

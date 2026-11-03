@@ -53,6 +53,12 @@ export function SidePanel() {
         <p className="break-all font-mono text-[13px]">{detail.path}</p>
       </section>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        {detail.line !== undefined && (
+          <>
+            <dt className="text-muted-foreground">Line</dt>
+            <dd className="font-mono tabular-nums">{formatCount(detail.line)}</dd>
+          </>
+        )}
         <dt className="text-muted-foreground">Type</dt>
         <dd className="font-mono">{detail.type}</dd>
         {isContainer && (

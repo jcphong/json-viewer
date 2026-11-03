@@ -6,8 +6,10 @@ import { TreePane } from "@/components/tree/TreePane";
 import { Button } from "@/components/ui/button";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { JsonErrorInfo } from "@/lib/errors";
-import { formatBytes, utf8ByteLength } from "@/lib/format";
+import { formatBytes, formatCount, utf8ByteLength } from "@/lib/format";
 import { beautifyJson, minifyJson, parseJson } from "@/lib/json";
+import { minifyJsonl, parseJsonl } from "@/lib/jsonl";
+import { isJsonlName, looksLikeJsonl } from "@/lib/node-index";
 import { cn } from "@/lib/utils";
 import { useTreeStore } from "@/store/useTreeStore";
 import { useViewerStore } from "@/store/useViewerStore";
@@ -15,6 +17,7 @@ import { getParser } from "@/workers/client";
 import type { LoadSource } from "@/workers/parser.worker";
 
 import { ErrorPanel } from "./ErrorPanel";
+import { LineErrorsPanel } from "./LineErrorsPanel";
 import type { JsonEditorHandle } from "./types";
 import { type ViewMode, ViewModeSwitch } from "./ViewModeSwitch";
 
@@ -33,6 +36,7 @@ type Status =
   | { kind: "empty" }
   | { kind: "loading" }
   | { kind: "valid" }
+  | { kind: "jsonl"; lines: number; malformed: number; errors: JsonErrorInfo[] }
   | { kind: "invalid"; error: JsonErrorInfo };
 
 /** A document too big for the editor; it lives only in the parser worker. */
@@ -72,6 +76,8 @@ export function EditorPane() {
   // Editor text revisions, to know whether the tree shows the current text.
   const textVersionRef = useRef(0);
   const treeVersionRef = useRef(-1);
+  // Whether the editor text was last recognized as JSON Lines.
+  const jsonlRef = useRef(false);
 
   const showValid = useCallback(
     (text: string, nodeCount: number, parseMs: number) => {
@@ -86,13 +92,50 @@ export function EditorPane() {
     [setStats],
   );
 
+  /** Mirrors a worker load (big documents, JSON Lines) in the status badge and status bar. */
+  const showTreeResult = useCallback(
+    (ok: boolean, sizeBytes: number) => {
+      const { stats, error, lineErrors } = useTreeStore.getState();
+      if (ok && stats) {
+        setStatus(
+          stats.format === "jsonl"
+            ? {
+                kind: "jsonl",
+                lines: stats.lines,
+                malformed: stats.malformedLines,
+                errors: lineErrors,
+              }
+            : { kind: "valid" },
+        );
+        setStats({
+          fileName: stats.name,
+          sizeBytes,
+          nodeCount: stats.nodeCount,
+          parseMs: stats.parseMs,
+          ...(stats.format === "jsonl" && {
+            lines: stats.lines,
+            malformedLines: stats.malformedLines,
+          }),
+        });
+      } else if (error) {
+        setStatus({ kind: "invalid", error });
+        setStats(null);
+      }
+    },
+    [setStats],
+  );
+
   /** Indexes the editor text in the worker for Tree mode, unless it is already current. */
-  const syncTree = useCallback(() => {
-    if (treeVersionRef.current === textVersionRef.current) return;
+  const syncTree = useCallback((): Promise<boolean> | null => {
+    if (treeVersionRef.current === textVersionRef.current) return null;
     treeVersionRef.current = textVersionRef.current;
-    void useTreeStore
+    return useTreeStore
       .getState()
-      .load({ text: editorRef.current?.getText() ?? "" }, docNameRef.current);
+      .load(
+        { text: editorRef.current?.getText() ?? "" },
+        docNameRef.current,
+        jsonlRef.current ? "jsonl" : "json",
+      );
   }, []);
 
   /** Rewrites the editor text minified or beautified. Returns false (and shows the error) if invalid. */
@@ -101,6 +144,16 @@ export function EditorPane() {
       const editor = editorRef.current;
       if (!editor) return false;
       window.clearTimeout(timerRef.current);
+      if (jsonlRef.current) {
+        // JSON Lines: minify line by line (Beautify would break one-record-per-line).
+        if (format === "beautify") return false;
+        applyingRef.current = true;
+        editor.setText(minifyJsonl(editor.getText()));
+        textVersionRef.current++;
+        applyingRef.current = false;
+        editor.focusAt();
+        return true;
+      }
       const result = (format === "minify" ? minifyJson : beautifyJson)(editor.getText());
       if (!result.ok) {
         setStatus({ kind: "invalid", error: result.error });
@@ -131,8 +184,41 @@ export function EditorPane() {
     }
     const firstContent = wasEmptyRef.current;
     wasEmptyRef.current = false;
-    const result = parseJson(text);
     const current = modeRef.current;
+    const named = isJsonlName(docNameRef.current);
+    const result = named ? null : parseJson(text);
+    if (!result || (!result.ok && looksLikeJsonl(text, result.error))) {
+      // JSON Lines: the worker indexes it (off the main thread) and reports lines and errors.
+      jsonlRef.current = true;
+      parsedRef.current = null;
+      setStatus({ kind: "loading" });
+      if (current === "minify" && firstContent) applyFormat("minify");
+      // A structured view suits JSON Lines best; Beautify isn't available for it.
+      if (current === "beautify") {
+        setDocuments(null);
+        setMode("tree");
+      }
+      if (current === "object") setDocuments({ root: parseJsonl(text).values });
+      const sizeBytes = utf8ByteLength(text);
+      const jsonError = result && !result.ok ? result.error : null;
+      treeVersionRef.current = -1;
+      void syncTree()?.then((ok) => {
+        const { stats } = useTreeStore.getState();
+        // No line parsed either: this is broken JSON, not JSON Lines.
+        if (jsonError && ok && stats && stats.lines === stats.malformedLines) {
+          jsonlRef.current = false;
+          setStatus({ kind: "invalid", error: jsonError });
+          setStats(null);
+          setDocuments(null);
+          setMode("beautify");
+          return;
+        }
+        showTreeResult(ok, sizeBytes);
+      });
+      return;
+    }
+    jsonlRef.current = false;
+    if (!result) return;
     if (!result.ok) {
       setStatus({ kind: "invalid", error: result.error });
       setStats(null);
@@ -150,8 +236,8 @@ export function EditorPane() {
     parsedRef.current = { value: result.value };
     showValid(text, result.nodeCount, result.parseMs);
     if (current === "object") setDocuments({ root: result.value });
-    if (current === "tree") syncTree();
-  }, [setStats, showValid, applyFormat, syncTree]);
+    if (current === "tree") void syncTree();
+  }, [setStats, showValid, applyFormat, syncTree, showTreeResult]);
 
   const handleChange = useCallback(() => {
     if (applyingRef.current) return;
@@ -197,16 +283,17 @@ export function EditorPane() {
       setStatus({ kind: "loading" });
       setStats(null);
       const ok = await useTreeStore.getState().load(source, name);
-      const { stats, error } = useTreeStore.getState();
-      if (ok && stats) {
-        setStatus({ kind: "valid" });
-        setStats({ fileName: name, sizeBytes, nodeCount: stats.nodeCount, parseMs: stats.parseMs });
-      } else if (error) {
-        setStatus({ kind: "invalid", error });
-      }
+      showTreeResult(ok, sizeBytes);
     },
-    [setStats],
+    [setStats, showTreeResult],
   );
+
+  // Big documents live only in the worker: keep the badge in step with it (e.g. a JSON/JSONL
+  // switch, which always passes through "loading").
+  useEffect(() => {
+    if (!bigDoc || treeStatus === "loading" || treeStatus === "empty") return;
+    showTreeResult(treeStatus === "ready", bigDoc.sizeBytes);
+  }, [bigDoc, treeStatus, showTreeResult]);
 
   const openFile = useCallback(
     async (file: File) => {
@@ -270,6 +357,16 @@ export function EditorPane() {
 
   const selectMode = (next: ViewMode) => {
     if (bigDoc) return; // Only Tree is available; the other options are disabled.
+    if ((next === "object" || next === "tree") && jsonlRef.current && status.kind === "jsonl") {
+      if (next === "object") {
+        setDocuments({ root: parseJsonl(editorRef.current?.getText() ?? "").values });
+      } else {
+        setDocuments(null);
+        void syncTree();
+      }
+      setMode(next);
+      return;
+    }
     if (next === "object" || next === "tree") {
       // Validation is debounced; make sure we show the current text, not a stale parse.
       if (!parsedRef.current) {
@@ -280,7 +377,7 @@ export function EditorPane() {
       if (next === "object") setDocuments({ root: parsedRef.current.value });
       else {
         setDocuments(null);
-        syncTree();
+        void syncTree();
       }
       setMode(next);
       return;
@@ -297,7 +394,9 @@ export function EditorPane() {
   const showingTree = mode === "tree";
   const showingEditor = !showingDocuments && !showingTree;
   const tooBig = bigDoc ? `Text views work up to ${formatBytes(TEXT_VIEW_LIMIT)}` : undefined;
-  const needsValid = status.kind === "valid" ? undefined : "Needs valid JSON";
+  const structured = status.kind === "valid" || status.kind === "jsonl";
+  const needsValid = structured ? undefined : "Needs valid JSON";
+  const isJsonl = status.kind === "jsonl";
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop target only; the Open button is the keyboard path.
@@ -320,7 +419,7 @@ export function EditorPane() {
           onSelect={selectMode}
           disabled={{
             minify: tooBig,
-            beautify: tooBig,
+            beautify: tooBig ?? (isJsonl ? "JSON Lines stay one record per line" : undefined),
             object: tooBig ?? (mode === "object" ? undefined : needsValid),
             tree: bigDoc ? undefined : mode === "tree" ? undefined : needsValid,
           }}
@@ -378,6 +477,14 @@ export function EditorPane() {
         </Suspense>
       </div>
 
+      {status.kind === "jsonl" && !showingTree && (
+        <LineErrorsPanel
+          errors={status.errors}
+          total={status.malformed}
+          onJump={showingEditor ? (error) => editorRef.current?.focusAt(error.position) : undefined}
+        />
+      )}
+
       {status.kind === "invalid" && showingEditor && !bigDoc && (
         <ErrorPanel
           error={status.error}
@@ -395,7 +502,7 @@ export function EditorPane() {
 }
 
 function ValidityBadge({ status, treeLoading }: { status: Status; treeLoading: boolean }) {
-  if (status.kind === "loading" || (treeLoading && status.kind === "valid")) {
+  if (status.kind === "loading" || (treeLoading && status.kind !== "invalid")) {
     return (
       <span className="inline-flex items-center gap-1 text-muted-foreground">
         <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
@@ -404,6 +511,19 @@ function ValidityBadge({ status, treeLoading }: { status: Status; treeLoading: b
     );
   }
   if (status.kind === "empty") return null;
+  if (status.kind === "jsonl") {
+    return (
+      <span className="inline-flex items-center gap-1 text-syntax-string">
+        <Check className="size-3.5" aria-hidden />
+        JSONL · {formatCount(status.lines)} {status.lines === 1 ? "line" : "lines"}
+        {status.malformed > 0 && (
+          <span className="text-amber-700 dark:text-amber-400">
+            · {formatCount(status.malformed)} malformed
+          </span>
+        )}
+      </span>
+    );
+  }
   if (status.kind === "valid") {
     return (
       <span className="inline-flex items-center gap-1 text-syntax-string">
