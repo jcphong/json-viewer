@@ -121,14 +121,14 @@ tests/            *.test.ts, e2e/
 **Done when:** `pnpm build` passes, the empty shell is live on Vercel, and the fixtures are generated.
 
 ### Phase 1: Core viewer (v0)
-- [ ] 1.1 Worker + Comlink API: `load`, `getRows`, `toggle`, `expandToDepth`, `collapseAll`, `stats`. Unit-test the index and row windowing.
-- [ ] 1.2 Input: paste (`⌘V` anywhere when nothing is focused), drag-and-drop, and a file picker. Show a loading state with parse progress if possible.
-- [ ] 1.3 Virtualized `TreeView`: indent guides, type colors, array index labels, `{n}`/`[n]` counts, and truncated long strings with a full value on hover or in the side panel.
-- [ ] 1.4 Expand controls: expand to depth 1/2/3/all and collapse all. Expanding "all" on huge files asks for confirmation or caps at N rows.
-- [ ] 1.5 Selection + side panel: shows the selected node's path, type, full value, and size. Buttons for Copy path, Copy value, and Copy as formatted JSON.
-- [ ] 1.6 Toolbar: format, minify, and copy the whole document. A raw view toggle opens CodeMirror (disabled above roughly 20MB, with a message).
-- [ ] 1.7 Parse errors: a clear panel with line, column, and a snippet.
-- [ ] 1.8 Security pass: no `innerHTML` or `dangerouslySetInnerHTML` anywhere, and grep to prove it.
+- [x] 1.1 Worker + Comlink API: `load`, `getRows`, `toggle`, `expandToDepth`, `collapseAll`, `stats`. Unit-test the index and row windowing.
+- [x] 1.2 Input: paste (`⌘V` anywhere when nothing is focused), drag-and-drop, and a file picker. Show a loading state with parse progress if possible.
+- [x] 1.3 Virtualized `TreeView`: indent guides, type colors, array index labels, `{n}`/`[n]` counts, and truncated long strings with a full value on hover or in the side panel.
+- [x] 1.4 Expand controls: expand to depth 1/2/3/all and collapse all. Expanding "all" on huge files asks for confirmation or caps at N rows.
+- [x] 1.5 Selection + side panel: shows the selected node's path, type, full value, and size. Buttons for Copy path, Copy value, and Copy as formatted JSON.
+- [x] 1.6 Toolbar: format, minify, and copy the whole document. A raw view toggle opens CodeMirror (disabled above roughly 20MB, with a message).
+- [x] 1.7 Parse errors: a clear panel with line, column, and a snippet.
+- [x] 1.8 Security pass: no `innerHTML` or `dangerouslySetInnerHTML` anywhere, and grep to prove it.
 
 **Done when:** `big-50mb.json` opens in under 3s and scrolls smoothly; `bigint.json` keeps exact digits; `bad.json` shows the right line and column; `deep.json` doesn't crash (iterative traversal, no recursion).
 
