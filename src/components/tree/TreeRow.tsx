@@ -5,6 +5,8 @@ import type { Row } from "@/lib/engine";
 import { formatCount } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { markMatches } from "./highlight";
+
 export const ROW_HEIGHT = 24;
 export const INDENT_PX = 16;
 
@@ -31,12 +33,17 @@ export const TreeRow = memo(function TreeRow({
   style,
   onSelect,
   onToggle,
+  highlightKey = null,
+  highlightValue = null,
 }: {
   row: Row;
   selected: boolean;
   style: CSSProperties;
   onSelect: (id: number) => void;
   onToggle: (id: number) => void;
+  /** Search pattern to mark in the key / value text (matching rows only). */
+  highlightKey?: RegExp | null;
+  highlightValue?: RegExp | null;
 }) {
   const expandable = (row.type === "object" || row.type === "array") && row.childCount > 0;
   const text = valueText(row);
@@ -57,7 +64,11 @@ export const TreeRow = memo(function TreeRow({
       }}
       className={cn(
         "flex cursor-default items-center whitespace-nowrap pr-3 font-mono text-[13px]",
-        selected ? "bg-accent" : "hover:bg-muted/60",
+        selected
+          ? "bg-accent"
+          : row.isMatch
+            ? "bg-amber-500/10 hover:bg-amber-500/15"
+            : "hover:bg-muted/60",
       )}
     >
       <span
@@ -100,7 +111,7 @@ export const TreeRow = memo(function TreeRow({
         ) : typeof row.key === "number" ? (
           <span className="text-muted-foreground">{row.key}</span>
         ) : (
-          <span className="text-syntax-key">{row.key}</span>
+          <span className="text-syntax-key">{markMatches(row.key, highlightKey)}</span>
         )}
         <span className="mr-1.5 text-muted-foreground">:</span>
       </span>
@@ -108,7 +119,7 @@ export const TreeRow = memo(function TreeRow({
         className={cn("min-w-0 truncate", VALUE_CLASS[row.type])}
         title={row.type === "string" ? text : undefined}
       >
-        {text}
+        {row.type === "object" || row.type === "array" ? text : markMatches(text, highlightValue)}
       </span>
     </div>
   );

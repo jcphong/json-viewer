@@ -4,11 +4,19 @@
  */
 import * as Comlink from "comlink";
 
-import { type CopyFormat, DocumentEngine, type FormatChoice, type LoadResult } from "@/lib/engine";
+import {
+  type CopyFormat,
+  DocumentEngine,
+  type FormatChoice,
+  type LoadResult,
+  type SearchOptions,
+} from "@/lib/engine";
 
 export type LoadSource = { text: string } | { file: File };
 
 const engine = new DocumentEngine();
+/** Each search gets a number; an older one stops at its next yield. */
+let searchSeq = 0;
 
 const api = {
   /** Reads (for files, inside the worker, so the main thread never holds the text) and indexes. */
@@ -30,7 +38,16 @@ const api = {
   expandToDepth: (levels: number) => engine.expandToDepth(levels),
   collapseAll: () => engine.collapseAll(),
   rowOf: (id: number) => engine.rowOf(id),
-  reveal: (id: number) => engine.reveal(id),
+  /** Expands the node's ancestors; returns its row and the new visible row count. */
+  reveal: (id: number) => ({ row: engine.reveal(id), visibleCount: engine.visibleCount() }),
+  search: (query: string, options: SearchOptions) => {
+    const seq = ++searchSeq;
+    return engine.search(query, options, () => seq === searchSeq);
+  },
+  clearSearch: () => {
+    searchSeq++;
+    engine.clearSearch();
+  },
   detail: (id: number) => engine.detail(id),
   copyText: (id: number, format: CopyFormat) => engine.copyText(id, format),
   stats: () => engine.getStats(),

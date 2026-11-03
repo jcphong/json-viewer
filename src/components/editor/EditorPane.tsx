@@ -389,6 +389,25 @@ export function EditorPane() {
     if (!hasText) editorRef.current?.focusAt();
   };
 
+  // ⌘K from the text views jumps to Tree mode with search open (⌘F stays the editor's own find).
+  const selectModeRef = useRef(selectMode);
+  selectModeRef.current = selectMode;
+  const canTree = Boolean(bigDoc) || status.kind === "valid" || status.kind === "jsonl";
+  const canTreeRef = useRef(canTree);
+  canTreeRef.current = canTree;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "k")
+        return;
+      if (modeRef.current === "tree" || !canTreeRef.current) return;
+      event.preventDefault();
+      selectModeRef.current("tree");
+      useTreeStore.getState().openSearch();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const empty = status.kind === "empty";
   const showingDocuments = mode === "object" && documents !== null;
   const showingTree = mode === "tree";

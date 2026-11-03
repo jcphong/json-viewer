@@ -1,10 +1,11 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Row } from "@/lib/engine";
 import { useTreeStore } from "@/store/useTreeStore";
 import { getParser } from "@/workers/client";
 
+import { highlightPattern } from "./highlight";
 import { INDENT_PX, PlaceholderRow, ROW_HEIGHT, TreeRow } from "./TreeRow";
 
 /** Minimum width left for key and value on deeply indented rows. */
@@ -99,6 +100,20 @@ export function TreeView() {
 
   const onToggle = useCallback((id: number) => void toggle(id), [toggle]);
 
+  const scrollTarget = useTreeStore((s) => s.scrollTarget);
+  useEffect(() => {
+    if (scrollTarget) virtualizer.scrollToIndex(scrollTarget.row, { align: "center" });
+  }, [scrollTarget, virtualizer]);
+
+  const search = useTreeStore((s) => s.search);
+  const searchOpen = useTreeStore((s) => s.searchOpen);
+  const pattern = useMemo(
+    () => (searchOpen && search.ids.length ? highlightPattern(search.query, search.options) : null),
+    [searchOpen, search.ids.length, search.query, search.options],
+  );
+  const keyPattern = search.options.scope === "values" ? null : pattern;
+  const valuePattern = search.options.scope === "keys" ? null : pattern;
+
   return (
     <div
       ref={scrollRef}
@@ -125,6 +140,8 @@ export function TreeView() {
               style={{ ...style, width: `max(100%, ${row.depth * INDENT_PX + MIN_TEXT_PX}px)` }}
               onSelect={select}
               onToggle={onToggle}
+              highlightKey={row.isMatch ? keyPattern : null}
+              highlightValue={row.isMatch ? valuePattern : null}
             />
           ) : (
             <PlaceholderRow key={item.key} style={{ ...style, width: "100%" }} />

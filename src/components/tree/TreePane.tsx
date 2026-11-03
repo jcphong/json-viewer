@@ -1,8 +1,11 @@
+import { useEffect } from "react";
 import { ErrorPanel } from "@/components/editor/ErrorPanel";
 import { LineErrorsPanel } from "@/components/editor/LineErrorsPanel";
 import { Button } from "@/components/ui/button";
+
 import { useTreeStore } from "@/store/useTreeStore";
 
+import { SearchBar } from "./SearchBar";
 import { SidePanel } from "./SidePanel";
 import { TreeToolbar } from "./TreeToolbar";
 import { TreeView } from "./TreeView";
@@ -16,6 +19,22 @@ export function TreePane() {
   const stats = useTreeStore((s) => s.stats);
   const lineErrors = useTreeStore((s) => s.lineErrors);
   const setFormat = useTreeStore((s) => s.setFormat);
+  const searchOpen = useTreeStore((s) => s.searchOpen);
+  const openSearch = useTreeStore((s) => s.openSearch);
+
+  // ⌘F / ⌘K (Ctrl on other systems) opens search over the whole document.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && (key === "f" || key === "k")) {
+        if (useTreeStore.getState().status !== "ready") return;
+        event.preventDefault();
+        openSearch();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openSearch]);
 
   if (status === "loading") {
     const percent = progress === null ? null : Math.round(progress * 100);
@@ -70,6 +89,7 @@ export function TreePane() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <TreeToolbar />
+      {searchOpen && <SearchBar />}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <TreeView />
         <div className="flex max-h-[40%] min-h-0 shrink-0 flex-col border-t md:max-h-none md:w-96 md:border-t-0 md:border-l">

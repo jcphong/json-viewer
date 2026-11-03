@@ -1,4 +1,4 @@
-import { ChevronsDownUp } from "lucide-react";
+import { ChevronsDownUp, Search } from "lucide-react";
 import { ToggleGroup } from "radix-ui";
 import { useState } from "react";
 
@@ -14,6 +14,7 @@ export function TreeToolbar() {
   const expandToDepth = useTreeStore((s) => s.expandToDepth);
   const collapseAll = useTreeStore((s) => s.collapseAll);
   const setFormat = useTreeStore((s) => s.setFormat);
+  const openSearch = useTreeStore((s) => s.openSearch);
   const [confirming, setConfirming] = useState(false);
   const nodeCount = stats?.nodeCount ?? 0;
 
@@ -28,6 +29,11 @@ export function TreeToolbar() {
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1 text-xs">
+      <Button size="xs" variant="ghost" onClick={openSearch} title="Search (⌘F)">
+        <Search data-icon="inline-start" />
+        Search
+      </Button>
+      <div className="mx-1 h-3.5 w-px bg-border" />
       <span className="mr-1 text-muted-foreground">Expand</span>
       {[1, 2, 3].map((levels) => (
         <Button
